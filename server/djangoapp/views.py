@@ -102,52 +102,41 @@ def get_cars(request):
 # from django.shortcuts import render
 # from .models import Dealership  # Assuming you have a Dealership model
 
-# def get_dealerships(request):
-#     try:
-#         dealerships = Dealership.objects.all()
-#         context = {"dealership_list": dealerships}
-#         return render(request, "index.html", context)
-#     except Exception as e:
-#         logger.error(f"Error fetching dealerships: {str(e)}")
-#         return render(request, "index.html", {"dealership_list": [], "error": "Unable to load dealerships."})
-
+#Update the `get_dealerships` render list of dealerships all by default, particular state if state is passed
+def get_dealerships(request, state="All"):
+    if(state == "All"):
+        endpoint = "/fetchDealers"
+    else:
+        endpoint = "/fetchDealers/"+state
+    dealerships = get_request(endpoint)
+    return JsonResponse({"status":200,"dealers":dealerships})
 
 # from django.shortcuts import render
 # from .models import DealerReview  # Assuming you have a DealerReview model
 
-# def get_dealer_reviews(request, dealer_id):
-#     try:
-#         reviews = DealerReview.objects.filter(dealer_id=dealer_id)
-#         context = {
-#             "dealer_id": dealer_id,
-#             "reviews": reviews
-#         }
-#         return render(request, "dealer_reviews.html", context)
-#     except Exception as e:
-#         logger.error(f"Error fetching reviews for dealer {dealer_id}: {str(e)}")
-#         return render(request, "dealer_reviews.html", {
-#             "dealer_id": dealer_id,
-#             "reviews": [],
-#             "error": "Unable to load dealer reviews."
-#         })
-
+def get_dealer_reviews(request, dealer_id):
+    # if dealer id has been provided
+    if(dealer_id):
+        endpoint = "/fetchReviews/dealer/"+str(dealer_id)
+        reviews = get_request(endpoint)
+        for review_detail in reviews:
+            response = analyze_review_sentiments(review_detail['review'])
+            print(response)
+            review_detail['sentiment'] = response['sentiment']
+        return JsonResponse({"status":200,"reviews":reviews})
+    else:
+        return JsonResponse({"status":400,"message":"Bad Request"})
 
 # from django.shortcuts import render, get_object_or_404
 # from .models import Dealership  # Assuming you have a Dealership model
 
-# def get_dealer_details(request, dealer_id):
-#     try:
-#         dealer = get_object_or_404(Dealership, id=dealer_id)
-#         context = {
-#             "dealer": dealer
-#         }
-#         return render(request, "dealer_details.html", context)
-#     except Exception as e:
-#         logger.error(f"Error fetching dealer details for ID {dealer_id}: {str(e)}")
-#         return render(request, "dealer_details.html", {
-#             "dealer": None,
-#             "error": "Unable to load dealer details."
-#         })
+def get_dealer_details(request, dealer_id):
+    if(dealer_id):
+        endpoint = "/fetchDealer/"+str(dealer_id)
+        dealership = get_request(endpoint)
+        return JsonResponse({"status":200,"dealer":dealership})
+    else:
+        return JsonResponse({"status":400,"message":"Bad Request"})
 
 
 # Create a `add_review` view to submit a review
@@ -156,40 +145,13 @@ def get_cars(request):
 # from .models import DealerReview, Dealership  # Assuming these models exist
 # import json
 
-# @csrf_exempt
-# def add_review(request):
-#     if request.method == 'POST':
-#         try:
-#             data = json.loads(request.body)
-
-#             dealer_id = data.get('dealer_id')
-#             reviewer_name = data.get('reviewer_name')
-#             comment = data.get('comment')
-#             rating = data.get('rating')
-
-#             # Validate input
-#             if not all([dealer_id, reviewer_name, comment, rating]):
-#                 return JsonResponse({"error": "Missing required fields"}, status=400)
-
-#             # Optional: Validate dealer exists
-#             dealership = Dealership.objects.filter(id=dealer_id).first()
-#             if not dealership:
-#                 return JsonResponse({"error": "Dealer not found"}, status=404)
-
-#             # Save the review
-#             review = DealerReview.objects.create(
-#                 dealer_id=dealer_id,
-#                 reviewer_name=reviewer_name,
-#                 comment=comment,
-#                 rating=rating
-#             )
-#             review.save()
-
-#             return JsonResponse({"status": "Review submitted successfully", "review_id": review.id})
-#         except json.JSONDecodeError:
-#             return JsonResponse({"error": "Invalid JSON"}, status=400)
-#         except Exception as e:
-#             logger.error(f"Error submitting review: {str(e)}")
-#             return JsonResponse({"error": "Server error"}, status=500)
-#     else:
-#         return JsonResponse({"error": "Invalid request method"}, status=405)
+def add_review(request):
+    if(request.user.is_anonymous == False):
+        data = json.loads(request.body)
+        try:
+            response = post_review(data)
+            return JsonResponse({"status":200})
+        except:
+            return JsonResponse({"status":401,"message":"Error in posting review"})
+    else:
+        return JsonResponse({"status":403,"message":"Unauthorized"})
