@@ -15,11 +15,12 @@ import json
 from django.views.decorators.csrf import csrf_exempt
 from .populate import initiate
 from .models import CarMake, CarModel
+from .restapis import get_request, analyze_review_sentiments, post_review
 
 
-# Get an instance of a logger
-logger = logging.getLogger(__name__)
 
+
+# Get an instance of a logge
 
 # Create your views here.
 
@@ -98,10 +99,6 @@ def get_cars(request):
         cars.append({"CarModel": car_model.name, "CarMake": car_model.car_make.name})
     return JsonResponse({"CarModels":cars})
 
-
-# from django.shortcuts import render
-# from .models import Dealership  # Assuming you have a Dealership model
-
 #Update the `get_dealerships` render list of dealerships all by default, particular state if state is passed
 def get_dealerships(request, state="All"):
     if(state == "All"):
@@ -111,9 +108,6 @@ def get_dealerships(request, state="All"):
     dealerships = get_request(endpoint)
     return JsonResponse({"status":200,"dealers":dealerships})
 
-# from django.shortcuts import render
-# from .models import DealerReview  # Assuming you have a DealerReview model
-
 def get_dealer_reviews(request, dealer_id):
     # if dealer id has been provided
     if(dealer_id):
@@ -121,14 +115,13 @@ def get_dealer_reviews(request, dealer_id):
         reviews = get_request(endpoint)
         for review_detail in reviews:
             response = analyze_review_sentiments(review_detail['review'])
-            print(response)
-            review_detail['sentiment'] = response['sentiment']
+            if response and 'sentiment' in response:
+                review_detail['sentiment'] = response['sentiment']
+            else:
+                review_detail['sentiment'] = 'unknown'  # Or any fallback value
         return JsonResponse({"status":200,"reviews":reviews})
     else:
         return JsonResponse({"status":400,"message":"Bad Request"})
-
-# from django.shortcuts import render, get_object_or_404
-# from .models import Dealership  # Assuming you have a Dealership model
 
 def get_dealer_details(request, dealer_id):
     if(dealer_id):
@@ -137,13 +130,6 @@ def get_dealer_details(request, dealer_id):
         return JsonResponse({"status":200,"dealer":dealership})
     else:
         return JsonResponse({"status":400,"message":"Bad Request"})
-
-
-# Create a `add_review` view to submit a review
-# from django.views.decorators.csrf import csrf_exempt
-# from django.http import JsonResponse
-# from .models import DealerReview, Dealership  # Assuming these models exist
-# import json
 
 def add_review(request):
     if(request.user.is_anonymous == False):
